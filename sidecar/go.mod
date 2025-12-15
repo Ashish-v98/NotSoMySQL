@@ -8,9 +8,9 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/bedrockruntime v1.7.0
 	github.com/go-sql-driver/mysql v1.7.1
 	github.com/jmoiron/sqlx v1.3.5
-	github.com/notsoMySQL/proto v0.0.0
+	github.com/notsoMySQL/sidecar-client v0.0.0-00010101000000-000000000000
 	google.golang.org/grpc v1.77.0
-	google.golang.org/protobuf v1.36.10
+	google.golang.org/protobuf v1.36.11
 )
 
 require (
@@ -32,4 +32,4 @@ require (
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20251022142026-3a174f9686a8 // indirect
 )
 
-replace github.com/notsoMySQL/proto => ../proto
+replace github.com/notsoMySQL/sidecar-client => ../sidecar-client

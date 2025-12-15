@@ -1,10 +1,10 @@
-module github.com/notsoMySQL/proto
+module github.com/notsoMySQL/sidecar-client
 
 go 1.24.10
 
 require (
 	google.golang.org/grpc v1.77.0
-	google.golang.org/protobuf v1.36.10
+	google.golang.org/protobuf v1.36.11
 )
 
 require (

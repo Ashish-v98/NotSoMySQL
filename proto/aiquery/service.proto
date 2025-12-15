@@ -2,29 +2,18 @@ syntax = "proto3";
 
 package aiquery.v1;
 
-option go_package = "github.com/notsoMySQL/proto/aiquery/v1;aiquery";
+option go_package = "github.com/notsoMySQL/sidecar-client;sidecar_client";
 
 import "google/protobuf/timestamp.proto";
 
 // ParentService is the gRPC service that sidecars connect to
+// Sidecars call these methods for lifecycle management
 service ParentService {
   // RegisterSidecar is called when a sidecar starts up
   rpc RegisterSidecar(RegisterRequest) returns (RegisterResponse);
 
   // Heartbeat is called periodically to maintain connection
   rpc Heartbeat(HeartbeatRequest) returns (HeartbeatResponse);
-
-  // ExecuteQuery executes a natural language query and returns results
-  rpc ExecuteQuery(QueryRequest) returns (QueryResponse);
-
-  // StreamQueryResults streams large result sets
-  rpc StreamQueryResults(QueryRequest) returns (stream QueryResultChunk);
-
-  // GetSchema retrieves database schema information
-  rpc GetSchema(SchemaRequest) returns (SchemaResponse);
-
-  // SaveDashboard saves a dashboard configuration
-  rpc SaveDashboard(SaveDashboardRequest) returns (SaveDashboardResponse);
 
   // UnregisterSidecar is called when a sidecar shuts down gracefully
   rpc UnregisterSidecar(UnregisterRequest) returns (UnregisterResponse);
@@ -211,4 +200,51 @@ message UnregisterRequest {
 
 message UnregisterResponse {
   bool acknowledged = 1;
+}
+
+// SidecarService is the gRPC service that each sidecar exposes
+// Parent calls these methods to execute queries on the sidecar
+service SidecarService {
+  // ExecuteQuery executes a natural language query (generates SQL with AI)
+  // Returns results inline for small datasets, or S3 path for large ones
+  rpc ExecuteQuery(SidecarQueryRequest) returns (SidecarQueryResponse);
+
+  // ExecuteDirectQuery executes a pre-generated SQL query (no AI generation)
+  // Used for saved queries and dashboard widgets
+  rpc ExecuteDirectQuery(DirectQueryRequest) returns (SidecarQueryResponse);
+
+  // GetSchema retrieves database schema
+  rpc GetSchema(SidecarSchemaRequest) returns (SchemaResponse);
+}
+
+// SidecarQueryRequest is sent from parent to sidecar
+message SidecarQueryRequest {
+  string query = 1;  // Natural language query
+  QueryOptions options = 2;
+}
+
+// SidecarQueryResponse is returned from sidecar to parent
+message SidecarQueryResponse {
+  string query_id = 1;
+  string generated_query = 2;  // The SQL/PartiQL/MQL that was generated
+
+  // Results can be returned inline or via S3
+  oneof result_location {
+    QueryResult inline_result = 3;  // For small results
+    string s3_path = 4;              // For large results (s3://bucket/key)
+  }
+
+  QueryMetadata metadata = 5;
+  string error = 6;
+}
+
+// SidecarSchemaRequest is sent from parent to sidecar
+message SidecarSchemaRequest {
+  bool include_sample_data = 1;
+}
+
+// DirectQueryRequest is sent from parent to sidecar for pre-generated queries
+message DirectQueryRequest {
+  string sql = 1;  // The SQL/PartiQL/MQL to execute directly
+  QueryOptions options = 2;
 }

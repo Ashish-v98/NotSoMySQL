@@ -5,9 +5,9 @@ go 1.24.10
 require (
 	github.com/gin-contrib/cors v1.7.2
 	github.com/gin-gonic/gin v1.10.0
-	github.com/notsoMySQL/proto v0.0.0
+	github.com/notsoMySQL/sidecar-client v0.0.0-00010101000000-000000000000
 	google.golang.org/grpc v1.77.0
-	google.golang.org/protobuf v1.36.10
+	google.golang.org/protobuf v1.36.11
 )
 
 require (
@@ -41,3 +41,5 @@ require (
 )
 
 replace github.com/notsoMySQL/proto => ../proto
+
+replace github.com/notsoMySQL/sidecar-client => ../sidecar-client

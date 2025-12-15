@@ -13,7 +13,7 @@ import (
 
 	"github.com/notsoMySQL/parent-service/internal/api"
 	grpcServer "github.com/notsoMySQL/parent-service/internal/grpc"
-	pb "github.com/notsoMySQL/proto/aiquery/v1"
+	pb "github.com/notsoMySQL/sidecar-client"
 	"google.golang.org/grpc"
 )
 

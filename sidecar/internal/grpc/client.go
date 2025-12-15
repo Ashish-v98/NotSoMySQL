@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	pb "github.com/notsoMySQL/proto/aiquery/v1"
+	pb "github.com/notsoMySQL/sidecar-client"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/types/known/timestamppb"

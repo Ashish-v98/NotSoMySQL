@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	pb "github.com/notsoMySQL/proto/aiquery/v1"
+	pb "github.com/notsoMySQL/sidecar-client"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -20,14 +20,14 @@ type Server struct {
 
 // SidecarInfo stores information about a connected sidecar
 type SidecarInfo struct {
-	ID          string
-	TeamID      string
-	ServiceName string
-	Version     string
-	DBInfo      *pb.DatabaseInfo
-	Hostname    string
-	Status      string
-	LastSeen    time.Time
+	ID           string
+	TeamID       string
+	ServiceName  string
+	Version      string
+	DBInfo       *pb.DatabaseInfo
+	Hostname     string
+	Status       string
+	LastSeen     time.Time
 	RegisteredAt time.Time
 }
 
@@ -48,14 +48,14 @@ func (s *Server) RegisterSidecar(ctx context.Context, req *pb.RegisterRequest) (
 
 	// Store sidecar info
 	s.sidecars[sidecarID] = &SidecarInfo{
-		ID:          sidecarID,
-		TeamID:      req.TeamId,
-		ServiceName: req.ServiceName,
-		Version:     req.Version,
-		DBInfo:      req.DbInfo,
-		Hostname:    req.Hostname,
-		Status:      "healthy",
-		LastSeen:    time.Now(),
+		ID:           sidecarID,
+		TeamID:       req.TeamId,
+		ServiceName:  req.ServiceName,
+		Version:      req.Version,
+		DBInfo:       req.DbInfo,
+		Hostname:     req.Hostname,
+		Status:       "healthy",
+		LastSeen:     time.Now(),
 		RegisteredAt: time.Now(),
 	}
 
@@ -112,12 +112,6 @@ func (s *Server) ExecuteQuery(ctx context.Context, req *pb.QueryRequest) (*pb.Qu
 	}, nil
 }
 
-// StreamQueryResults handles streaming query results
-func (s *Server) StreamQueryResults(req *pb.QueryRequest, stream pb.ParentService_StreamQueryResultsServer) error {
-	// TODO: Implement streaming
-	return fmt.Errorf("streaming not yet implemented")
-}
-
 // GetSchema retrieves database schema
 func (s *Server) GetSchema(ctx context.Context, req *pb.SchemaRequest) (*pb.SchemaResponse, error) {
 	s.mu.RLock()
@@ -132,9 +126,9 @@ func (s *Server) GetSchema(ctx context.Context, req *pb.SchemaRequest) (*pb.Sche
 
 	// TODO: Implement schema retrieval
 	return &pb.SchemaResponse{
-		Tables:      []*pb.TableSchema{},
+		Tables:        []*pb.TableSchema{},
 		SchemaVersion: "1.0",
-		LastUpdated:  timestamppb.Now(),
+		LastUpdated:   timestamppb.Now(),
 	}, nil
 }
 
