@@ -1,0 +1,34 @@
+# Environment variables with secrets
+.env
+
+# Go
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+go.work
+vendor/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker volumes
+mysql_data/
+
+# Logs
+*.log
+
+# Temporary files
+tmp/
+temp/

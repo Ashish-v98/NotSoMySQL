@@ -1,0 +1,214 @@
+syntax = "proto3";
+
+package aiquery.v1;
+
+option go_package = "github.com/notsoMySQL/proto/aiquery/v1;aiquery";
+
+import "google/protobuf/timestamp.proto";
+
+// ParentService is the gRPC service that sidecars connect to
+service ParentService {
+  // RegisterSidecar is called when a sidecar starts up
+  rpc RegisterSidecar(RegisterRequest) returns (RegisterResponse);
+
+  // Heartbeat is called periodically to maintain connection
+  rpc Heartbeat(HeartbeatRequest) returns (HeartbeatResponse);
+
+  // ExecuteQuery executes a natural language query and returns results
+  rpc ExecuteQuery(QueryRequest) returns (QueryResponse);
+
+  // StreamQueryResults streams large result sets
+  rpc StreamQueryResults(QueryRequest) returns (stream QueryResultChunk);
+
+  // GetSchema retrieves database schema information
+  rpc GetSchema(SchemaRequest) returns (SchemaResponse);
+
+  // SaveDashboard saves a dashboard configuration
+  rpc SaveDashboard(SaveDashboardRequest) returns (SaveDashboardResponse);
+
+  // UnregisterSidecar is called when a sidecar shuts down gracefully
+  rpc UnregisterSidecar(UnregisterRequest) returns (UnregisterResponse);
+}
+
+// RegisterRequest contains information about a sidecar registering with parent
+message RegisterRequest {
+  string team_id = 1;
+  string service_name = 2;
+  string version = 3;
+  DatabaseInfo db_info = 4;
+  string hostname = 5;
+}
+
+message RegisterResponse {
+  string sidecar_id = 1;
+  bool success = 2;
+  string message = 3;
+}
+
+// DatabaseInfo describes the database the sidecar is connected to
+message DatabaseInfo {
+  string db_type = 1;  // postgres, mysql, dynamodb, mongodb
+  string db_name = 2;
+  string host = 3;
+  int32 port = 4;
+  int32 table_count = 5;
+}
+
+// HeartbeatRequest is sent periodically by sidecars
+message HeartbeatRequest {
+  string sidecar_id = 1;
+  string status = 2;  // healthy, degraded, unhealthy
+  google.protobuf.Timestamp timestamp = 3;
+  HealthMetrics metrics = 4;
+}
+
+message HeartbeatResponse {
+  bool acknowledged = 1;
+  google.protobuf.Timestamp server_time = 2;
+}
+
+// HealthMetrics provides basic health information
+message HealthMetrics {
+  int32 active_connections = 1;
+  int32 queries_per_minute = 2;
+  double cpu_percent = 3;
+  double memory_percent = 4;
+}
+
+// QueryRequest contains a natural language query
+message QueryRequest {
+  string sidecar_id = 1;
+  string team_id = 2;
+  string query = 3;  // Natural language query
+  QueryOptions options = 4;
+}
+
+message QueryOptions {
+  int32 row_limit = 1;  // Max rows to return (default 10000)
+  int32 timeout_seconds = 2;  // Query timeout (default 30)
+  bool use_cache = 3;  // Whether to use cached results
+  bool explain = 4;  // Return query explanation
+}
+
+// QueryResponse contains the generated SQL/query and results
+message QueryResponse {
+  string query_id = 1;
+  string generated_query = 2;  // SQL, PartiQL, or MQL
+  QueryResult result = 3;
+  QueryMetadata metadata = 4;
+  string error = 5;
+}
+
+// QueryResult holds the actual data returned
+message QueryResult {
+  repeated string columns = 1;
+  repeated Row rows = 2;
+  int32 row_count = 3;
+}
+
+message Row {
+  map<string, Value> values = 1;
+}
+
+message Value {
+  oneof value {
+    string string_value = 1;
+    int64 int_value = 2;
+    double double_value = 3;
+    bool bool_value = 4;
+    bytes bytes_value = 5;
+    google.protobuf.Timestamp timestamp_value = 6;
+  }
+  bool is_null = 7;
+}
+
+message QueryMetadata {
+  google.protobuf.Timestamp execution_time = 1;
+  int32 duration_ms = 2;
+  string ai_model_used = 3;
+  bool from_cache = 4;
+  int32 tokens_used = 5;
+}
+
+// QueryResultChunk for streaming large results
+message QueryResultChunk {
+  string query_id = 1;
+  int32 chunk_number = 2;
+  repeated Row rows = 3;
+  bool is_final_chunk = 4;
+}
+
+// SchemaRequest asks for database schema
+message SchemaRequest {
+  string sidecar_id = 1;
+  string team_id = 2;
+  bool include_sample_data = 3;
+}
+
+message SchemaResponse {
+  repeated TableSchema tables = 1;
+  string schema_version = 2;
+  google.protobuf.Timestamp last_updated = 3;
+}
+
+message TableSchema {
+  string name = 1;
+  repeated ColumnSchema columns = 2;
+  int64 row_count = 3;
+  repeated Index indexes = 4;
+}
+
+message ColumnSchema {
+  string name = 1;
+  string data_type = 2;
+  bool nullable = 3;
+  bool primary_key = 4;
+  bool foreign_key = 5;
+  string foreign_table = 6;
+  string default_value = 7;
+}
+
+message Index {
+  string name = 1;
+  repeated string columns = 2;
+  bool unique = 3;
+}
+
+// SaveDashboardRequest saves a dashboard configuration
+message SaveDashboardRequest {
+  string team_id = 1;
+  string dashboard_name = 2;
+  repeated Widget widgets = 3;
+  map<string, string> metadata = 4;
+}
+
+message SaveDashboardResponse {
+  string dashboard_id = 1;
+  bool success = 2;
+  string message = 3;
+}
+
+message Widget {
+  string widget_id = 1;
+  string widget_type = 2;  // table, bar_chart, line_chart, pie_chart, metric
+  string query = 3;
+  map<string, string> config = 4;  // Widget-specific configuration
+  Position position = 5;
+}
+
+message Position {
+  int32 x = 1;
+  int32 y = 2;
+  int32 width = 3;
+  int32 height = 4;
+}
+
+// UnregisterRequest is sent when sidecar shuts down
+message UnregisterRequest {
+  string sidecar_id = 1;
+  string reason = 2;
+}
+
+message UnregisterResponse {
+  bool acknowledged = 1;
+}
