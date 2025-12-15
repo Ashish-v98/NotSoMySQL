@@ -34,6 +34,48 @@ services:
       mysql:
         condition: service_healthy
 
+  localstack:
+    image: localstack/localstack:latest
+    container_name: ai-query-localstack
+    environment:
+      SERVICES: s3
+      DEBUG: 1
+      DATA_DIR: /tmp/localstack/data
+      AWS_DEFAULT_REGION: us-east-1
+      EAGER_SERVICE_LOADING: 1
+    ports:
+      - "4566:4566"
+      - "4571:4571"
+    volumes:
+      - localstack_data:/tmp/localstack
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./localstack-init.sh:/etc/localstack/init/ready.d/init.sh
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4566/_localstack/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  localstack-init:
+    image: amazon/aws-cli:latest
+    container_name: ai-query-localstack-init
+    environment:
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      AWS_DEFAULT_REGION: us-east-1
+      AWS_ENDPOINT_URL: http://localstack:4566
+    command: >
+      sh -c "
+        echo 'Waiting for LocalStack...' &&
+        while ! aws --endpoint-url=http://localstack:4566 s3 ls 2>/dev/null; do sleep 1; done &&
+        echo 'Creating S3 bucket: ai-query-results' &&
+        aws --endpoint-url=http://localstack:4566 s3 mb s3://ai-query-results &&
+        echo 'LocalStack initialization complete!'
+      "
+    depends_on:
+      localstack:
+        condition: service_healthy
+
   parent-service:
     build:
       context: .
@@ -42,9 +84,18 @@ services:
     environment:
       GRPC_PORT: 9090
       REST_PORT: 8090
+      # S3 config for LocalStack
+      AWS_ENDPOINT_URL: http://localstack:4566
+      AWS_REGION: us-east-1
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      S3_BUCKET: ai-query-results
     ports:
       - "9090:9090"
       - "8090:8090"
+    depends_on:
+      localstack:
+        condition: service_healthy
     restart: unless-stopped
 
   dashboard:
@@ -75,13 +126,18 @@ services:
       AI_PROVIDER: ${AI_PROVIDER:-ollama}
       AI_MODEL_ID: ${AI_MODEL_ID:-qwen2.5-coder:7b}
       OLLAMA_URL: ${OLLAMA_URL:-http://host.containers.internal:11434}
-      # AWS Bedrock config (if using bedrock)
-      AWS_REGION: ${AWS_REGION:-us-east-1}
-      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
-      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
-      AWS_SESSION_TOKEN: ${AWS_SESSION_TOKEN}
+      # AWS/LocalStack config
+      AWS_ENDPOINT_URL: http://localstack:4566
+      AWS_REGION: us-east-1
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      # S3 config
+      S3_BUCKET: ai-query-results
+      S3_REGION: us-east-1
+      S3_RESULT_SIZE_LIMIT: 1048576
       # Server config
       SERVER_PORT: 8080
+      GRPC_PORT: 8080
       # Parent service config
       PARENT_ENABLED: "true"
       PARENT_ADDRESS: parent-service:9090
@@ -94,9 +150,12 @@ services:
     depends_on:
       mysql:
         condition: service_healthy
+      localstack:
+        condition: service_healthy
       parent-service:
         condition: service_started
     restart: unless-stopped
 
 volumes:
   mysql_data:
+  localstack_data:

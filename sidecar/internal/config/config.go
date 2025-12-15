@@ -2,7 +2,8 @@ package config
 
 import (
 	"fmt"
-	"os"
+
+	"github.com/spf13/viper"
 )
 
 type Config struct {
@@ -11,10 +12,11 @@ type Config struct {
 	Server   ServerConfig
 	Parent   ParentConfig
 	Sidecar  SidecarConfig
+	S3       S3Config
 }
 
 type DatabaseConfig struct {
-	Type     string // mysql, dynamodb, mongodb, etc.
+	Type     string
 	Host     string
 	Port     string
 	User     string
@@ -44,45 +46,65 @@ type SidecarConfig struct {
 	Version     string
 }
 
-// LoadFromEnv loads configuration from environment variables
+type S3Config struct {
+	Bucket         string
+	Region         string
+	ResultSizeLimit int // Size limit in bytes for inline results (larger results go to S3)
+}
+
+// LoadFromEnv loads configuration from config.yaml file
+// Environment variables can override config values
 func LoadFromEnv() (*Config, error) {
+	// Set config file name and path
+	viper.SetConfigName("config")
+	viper.SetConfigType("yaml")
+	viper.AddConfigPath(".")           // Look in current directory
+	viper.AddConfigPath("./sidecar")   // Look in sidecar directory
+	viper.AddConfigPath("/etc/sidecar") // Look in /etc/sidecar
+
+	// Enable environment variable overrides
+	viper.AutomaticEnv()
+
+	// Read config file
+	if err := viper.ReadInConfig(); err != nil {
+		return nil, fmt.Errorf("failed to read config file: %w", err)
+	}
+
 	config := &Config{
 		Database: DatabaseConfig{
-			Type:     getEnv("DB_TYPE", "mysql"),
-			Host:     getEnv("DB_HOST", "localhost"),
-			Port:     getEnv("DB_PORT", "3306"),
-			User:     getEnv("DB_USER", "root"),
-			Password: getEnv("DB_PASSWORD", "password"),
-			DBName:   getEnv("DB_NAME", "testdb"),
+			Type:     viper.GetString("database.type"),
+			Host:     viper.GetString("database.host"),
+			Port:     viper.GetString("database.port"),
+			User:     viper.GetString("database.user"),
+			Password: viper.GetString("database.password"),
+			DBName:   viper.GetString("database.dbname"),
 		},
 		AI: AIConfig{
-			Provider:  getEnv("AI_PROVIDER", "ollama"),
-			AWSRegion: getEnv("AWS_REGION", "us-east-1"),
-			ModelID:   getEnv("AI_MODEL_ID", "qwen2.5-coder:7b"),
-			OllamaURL: getEnv("OLLAMA_URL", "http://host.docker.internal:11434"),
+			Provider:  viper.GetString("ai.provider"),
+			AWSRegion: viper.GetString("ai.aws_region"),
+			ModelID:   viper.GetString("ai.model_id"),
+			OllamaURL: viper.GetString("ai.ollama_url"),
 		},
 		Server: ServerConfig{
-			Port: getEnv("SERVER_PORT", "8080"),
+			Port: viper.GetString("server.port"),
 		},
 		Parent: ParentConfig{
-			Address: getEnv("PARENT_ADDRESS", "localhost:9090"),
-			Enabled: getEnv("PARENT_ENABLED", "false") == "true",
+			Address: viper.GetString("parent.address"),
+			Enabled: viper.GetBool("parent.enabled"),
 		},
 		Sidecar: SidecarConfig{
-			TeamID:      getEnv("TEAM_ID", "default-team"),
-			ServiceName: getEnv("SERVICE_NAME", "default-service"),
-			Version:     getEnv("SIDECAR_VERSION", "1.0.0"),
+			TeamID:      viper.GetString("sidecar.team_id"),
+			ServiceName: viper.GetString("sidecar.service_name"),
+			Version:     viper.GetString("sidecar.version"),
+		},
+		S3: S3Config{
+			Bucket:          viper.GetString("s3.bucket"),
+			Region:          viper.GetString("s3.region"),
+			ResultSizeLimit: viper.GetInt("s3.result_size_limit"),
 		},
 	}
 
 	return config, nil
-}
-
-func getEnv(key, defaultValue string) string {
-	if value := os.Getenv(key); value != "" {
-		return value
-	}
-	return defaultValue
 }
 
 // GetDSN returns the database connection string

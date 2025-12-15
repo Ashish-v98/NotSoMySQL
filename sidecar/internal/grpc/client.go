@@ -16,14 +16,14 @@ import (
 
 // Client manages the gRPC connection to the parent service
 type Client struct {
-	conn       *grpc.ClientConn
-	client     pb.ParentServiceClient
-	sidecarID  string
-	teamID     string
+	conn        *grpc.ClientConn
+	client      pb.ParentServiceClient
+	sidecarID   string
+	teamID      string
 	serviceName string
-	version    string
-	dbInfo     *pb.DatabaseInfo
-	httpPort   string // HTTP port for parent to call back
+	version     string
+	dbInfo      *pb.DatabaseInfo
+	grpcPort    string // gRPC port for parent to call back
 
 	mu         sync.RWMutex
 	registered bool
@@ -31,7 +31,7 @@ type Client struct {
 }
 
 // NewClient creates a new gRPC client for connecting to parent service
-func NewClient(address, teamID, serviceName, version, httpPort string) (*Client, error) {
+func NewClient(address, teamID, serviceName, version, grpcPort string) (*Client, error) {
 	// Create gRPC connection with options
 	opts := []grpc.DialOption{
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
@@ -52,7 +52,7 @@ func NewClient(address, teamID, serviceName, version, httpPort string) (*Client,
 		teamID:      teamID,
 		serviceName: serviceName,
 		version:     version,
-		httpPort:    httpPort,
+		grpcPort:    grpcPort,
 		stopCh:      make(chan struct{}),
 	}, nil
 }
@@ -71,15 +71,15 @@ func (c *Client) SetDatabaseInfo(dbType, dbName, host string, port, tableCount i
 // Register registers this sidecar with the parent service
 func (c *Client) Register(ctx context.Context) error {
 	hostname, _ := os.Hostname()
-	// Include HTTP port in hostname for parent to call back
-	httpEndpoint := fmt.Sprintf("%s:%s", hostname, c.httpPort)
+	// Include gRPC port in hostname for parent to call back
+	grpcEndpoint := fmt.Sprintf("%s:%s", hostname, c.grpcPort)
 
 	req := &pb.RegisterRequest{
 		TeamId:      c.teamID,
 		ServiceName: c.serviceName,
 		Version:     c.version,
 		DbInfo:      c.dbInfo,
-		Hostname:    httpEndpoint, // Format: "hostname:port"
+		Hostname:    grpcEndpoint, // Format: "hostname:port"
 	}
 
 	resp, err := c.client.RegisterSidecar(ctx, req)

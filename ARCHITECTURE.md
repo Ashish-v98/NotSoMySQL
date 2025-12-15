@@ -180,12 +180,14 @@ Based on database type, sidecar selects appropriate AI prompt template:
 **Responsibilities**:
 - Connect to team's RDS database
 - Introspect database schema
-- Communicate with AWS Bedrock for natural language to SQL conversion
+- Communicate with AWS Bedrock/Ollama for natural language to SQL conversion
 - Execute SQL queries safely with validation
-- Send results to parent service via gRPC
+- Upload large query results to S3 (>1MB)
+- Return results inline or S3 path via gRPC
+- Expose gRPC service for parent to call
 - Maintain heartbeat with parent service
-- Load configuration from SSM Parameter Store
-- Retrieve database credentials from Secrets Manager
+- Load configuration from config.yaml (Viper)
+- Support LocalStack for local S3 development
 
 **Key Features**:
 - Read-only query execution by default (configurable)
@@ -387,21 +389,26 @@ UnregisterSidecar()      # Graceful shutdown
    - Forwards via gRPC to sidecar
 
 3. **Sidecar** (Processes Query)
-   - Receives gRPC request
+   - Receives gRPC request from parent
    - Fetches database schema (cached)
-   - Constructs Bedrock prompt with schema context
-   - Calls Bedrock API
+   - Constructs AI prompt with schema context (Bedrock/Ollama)
+   - Calls AI service with retry logic (max 3 attempts)
    - Receives generated SQL
-   - Validates SQL (syntax, allowed tables, no mutations)
-   - Executes SQL on RDS with timeout and row limit
-   - Formats results
-   - Sends results back via gRPC to parent
+   - Validates SQL (syntax, SELECT-only, no mutations)
+   - Executes SQL on database with timeout and row limit
+   - Checks result size:
+     - **Small (<1MB)**: Returns inline via gRPC
+     - **Large (>1MB)**: Uploads to S3, returns S3 path via gRPC
+   - Returns SidecarQueryResponse to parent
 
 4. **Parent Service** (Returns Results)
-   - Receives results from sidecar
+   - Receives SidecarQueryResponse from sidecar
+   - Checks result location:
+     - **Inline**: Use results directly
+     - **S3 Path**: Download from S3 using S3 client
    - Caches results in Redis (1 hour TTL)
-   - Determines suggested visualization type
-   - Returns to dashboard
+   - Converts to REST API format
+   - Returns to dashboard with metadata
 
 5. **Dashboard** (Displays Results)
    - Renders data in suggested chart type
@@ -412,25 +419,31 @@ UnregisterSidecar()      # Graceful shutdown
 ### Sidecar Registration Flow
 
 1. **Sidecar Starts**
-   - Loads config from SSM
-   - Connects to RDS
-   - Introspects schema
-   - Resolves parent service address via Cloud Map
+   - Loads config from config.yaml (Viper)
+   - Connects to database (MySQL/PostgreSQL)
+   - Initializes AI client (Ollama or Bedrock)
+   - Initializes S3 client (AWS S3 or LocalStack)
+   - Starts gRPC server on configured port (default 8080)
+   - Resolves parent service address from config
 
 2. **Register with Parent**
-   - Calls RegisterSidecar gRPC
-   - Sends: team_id, service_name, version, db_info
-   - Receives: sidecar_id
+   - Opens gRPC connection to parent service
+   - Calls RegisterSidecar RPC
+   - Sends: team_id, service_name, version, db_info, hostname:port
+   - Receives: sidecar_id, success status
+   - Stores sidecar_id for heartbeat
 
 3. **Heartbeat Loop**
-   - Every 30 seconds, send heartbeat
+   - Every 30 seconds, send Heartbeat RPC
+   - Includes: sidecar_id, status, metrics, timestamp
    - Parent updates last_seen timestamp
    - If heartbeat fails 3 times, mark as unhealthy
 
 4. **Parent Monitoring**
-   - Every 60 seconds, check all sidecars
+   - Tracks all registered sidecars with GRPCAddress
    - If last_seen > 2 minutes, mark as disconnected
-   - Send alert if sidecar disconnected
+   - Can call sidecar's Health RPC directly
+   - Routes queries to sidecar via ExecuteQuery RPC
 
 ---
 

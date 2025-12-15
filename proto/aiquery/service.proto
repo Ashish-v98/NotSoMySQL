@@ -135,7 +135,7 @@ message SchemaRequest {
 }
 
 message SchemaResponse {
-  repeated TableSchema tables = 1;
+  string schema_text = 1;  // Raw schema as string (for AI context)
   string schema_version = 2;
   google.protobuf.Timestamp last_updated = 3;
 }
@@ -205,6 +205,9 @@ message UnregisterResponse {
 // SidecarService is the gRPC service that each sidecar exposes
 // Parent calls these methods to execute queries on the sidecar
 service SidecarService {
+  // Health check for the sidecar
+  rpc Health(HealthCheckRequest) returns (HealthCheckResponse);
+
   // ExecuteQuery executes a natural language query (generates SQL with AI)
   // Returns results inline for small datasets, or S3 path for large ones
   rpc ExecuteQuery(SidecarQueryRequest) returns (SidecarQueryResponse);
@@ -247,4 +250,18 @@ message SidecarSchemaRequest {
 message DirectQueryRequest {
   string sql = 1;  // The SQL/PartiQL/MQL to execute directly
   QueryOptions options = 2;
+}
+
+// HealthCheckRequest for sidecar health check
+message HealthCheckRequest {
+}
+
+// HealthCheckResponse returns sidecar health status
+message HealthCheckResponse {
+  string status = 1;  // "healthy", "degraded", "unhealthy"
+  google.protobuf.Timestamp timestamp = 2;
+  string ai_provider = 3;
+  string ai_model = 4;
+  string db_type = 5;
+  string db_name = 6;
 }

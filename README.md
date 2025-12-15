@@ -15,9 +15,10 @@ Dashboard (React) --> Parent Service (REST) --> Sidecar (gRPC) --> Database + AI
 |-----------|------|-------------|
 | Dashboard | 3000 | React frontend for querying data |
 | Parent Service | 8090 (REST), 9090 (gRPC) | Central hub, routes queries to sidecars |
-| Sidecar | 8080 | Connects to DB, generates SQL via AI |
+| Sidecar | 8080 (gRPC) | Connects to DB, generates SQL via AI, uploads large results to S3 |
 | MySQL | 3306 | Sample database |
 | phpMyAdmin | 8081 | Database admin UI |
+| LocalStack | 4566 | Local AWS S3 emulator for development |
 
 ## Quick Start
 
@@ -34,25 +35,33 @@ docker-compose logs -f
 Services available at:
 - **Dashboard**: http://localhost:3000
 - **Parent API**: http://localhost:8090/api/v1/health
-- **Sidecar API**: http://localhost:8080/health
+- **Sidecar** (gRPC only): localhost:8080
 - **phpMyAdmin**: http://localhost:8081
+- **LocalStack S3**: http://localhost:4566
 
 ### Option 2: Local Development
 
 ```bash
-# Terminal 1: Start MySQL
-docker-compose up -d mysql phpmyadmin
+# Terminal 1: Start infrastructure (MySQL, LocalStack)
+docker-compose up -d mysql phpmyadmin localstack localstack-init
 
 # Terminal 2: Start Parent Service
 cd parent-service
+export AWS_ENDPOINT_URL=http://localhost:4566
+export AWS_REGION=us-east-1
+export AWS_ACCESS_KEY_ID=test
+export AWS_SECRET_ACCESS_KEY=test
 go run cmd/server/main.go
 
 # Terminal 3: Start Sidecar
 cd sidecar
+# Use config.yaml for main config, or override with env vars:
 export PARENT_ENABLED=true
 export PARENT_ADDRESS=localhost:9090
 export AI_PROVIDER=ollama
 export OLLAMA_URL=http://localhost:11434
+export AWS_ENDPOINT_URL=http://localhost:4566
+export S3_BUCKET=ai-query-results
 go run cmd/sidecar/main.go
 
 # Terminal 4: Start Dashboard

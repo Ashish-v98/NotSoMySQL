@@ -209,6 +209,7 @@ var ParentService_ServiceDesc = grpc.ServiceDesc{
 }
 
 const (
+	SidecarService_Health_FullMethodName             = "/aiquery.v1.SidecarService/Health"
 	SidecarService_ExecuteQuery_FullMethodName       = "/aiquery.v1.SidecarService/ExecuteQuery"
 	SidecarService_ExecuteDirectQuery_FullMethodName = "/aiquery.v1.SidecarService/ExecuteDirectQuery"
 	SidecarService_GetSchema_FullMethodName          = "/aiquery.v1.SidecarService/GetSchema"
@@ -221,6 +222,8 @@ const (
 // SidecarService is the gRPC service that each sidecar exposes
 // Parent calls these methods to execute queries on the sidecar
 type SidecarServiceClient interface {
+	// Health check for the sidecar
+	Health(ctx context.Context, in *HealthCheckRequest, opts ...grpc.CallOption) (*HealthCheckResponse, error)
 	// ExecuteQuery executes a natural language query (generates SQL with AI)
 	// Returns results inline for small datasets, or S3 path for large ones
 	ExecuteQuery(ctx context.Context, in *SidecarQueryRequest, opts ...grpc.CallOption) (*SidecarQueryResponse, error)
@@ -237,6 +240,16 @@ type sidecarServiceClient struct {
 
 func NewSidecarServiceClient(cc grpc.ClientConnInterface) SidecarServiceClient {
 	return &sidecarServiceClient{cc}
+}
+
+func (c *sidecarServiceClient) Health(ctx context.Context, in *HealthCheckRequest, opts ...grpc.CallOption) (*HealthCheckResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(HealthCheckResponse)
+	err := c.cc.Invoke(ctx, SidecarService_Health_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func (c *sidecarServiceClient) ExecuteQuery(ctx context.Context, in *SidecarQueryRequest, opts ...grpc.CallOption) (*SidecarQueryResponse, error) {
@@ -276,6 +289,8 @@ func (c *sidecarServiceClient) GetSchema(ctx context.Context, in *SidecarSchemaR
 // SidecarService is the gRPC service that each sidecar exposes
 // Parent calls these methods to execute queries on the sidecar
 type SidecarServiceServer interface {
+	// Health check for the sidecar
+	Health(context.Context, *HealthCheckRequest) (*HealthCheckResponse, error)
 	// ExecuteQuery executes a natural language query (generates SQL with AI)
 	// Returns results inline for small datasets, or S3 path for large ones
 	ExecuteQuery(context.Context, *SidecarQueryRequest) (*SidecarQueryResponse, error)
@@ -294,6 +309,9 @@ type SidecarServiceServer interface {
 // pointer dereference when methods are called.
 type UnimplementedSidecarServiceServer struct{}
 
+func (UnimplementedSidecarServiceServer) Health(context.Context, *HealthCheckRequest) (*HealthCheckResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method Health not implemented")
+}
 func (UnimplementedSidecarServiceServer) ExecuteQuery(context.Context, *SidecarQueryRequest) (*SidecarQueryResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ExecuteQuery not implemented")
 }
@@ -322,6 +340,24 @@ func RegisterSidecarServiceServer(s grpc.ServiceRegistrar, srv SidecarServiceSer
 		t.testEmbeddedByValue()
 	}
 	s.RegisterService(&SidecarService_ServiceDesc, srv)
+}
+
+func _SidecarService_Health_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(HealthCheckRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SidecarServiceServer).Health(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SidecarService_Health_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SidecarServiceServer).Health(ctx, req.(*HealthCheckRequest))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
 func _SidecarService_ExecuteQuery_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -385,6 +421,10 @@ var SidecarService_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "aiquery.v1.SidecarService",
 	HandlerType: (*SidecarServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "Health",
+			Handler:    _SidecarService_Health_Handler,
+		},
 		{
 			MethodName: "ExecuteQuery",
 			Handler:    _SidecarService_ExecuteQuery_Handler,

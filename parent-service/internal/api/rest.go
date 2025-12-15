@@ -1,21 +1,24 @@
 package api
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"time"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	pb "github.com/notsoMySQL/sidecar-client"
 	grpcserver "github.com/notsoMySQL/parent-service/internal/grpc"
+	"github.com/notsoMySQL/parent-service/internal/s3"
 	"github.com/notsoMySQL/parent-service/internal/sidecar"
 )
 
 // RESTServer handles REST API requests from the dashboard
 type RESTServer struct {
-	grpcServer    *grpcserver.Server
-	sidecarClient *sidecar.Client
-	router        *gin.Engine
+	grpcServer *grpcserver.Server
+	s3Client   *s3.Client
+	router     *gin.Engine
 }
 
 // QueryRequest represents a natural language query request
@@ -73,10 +76,17 @@ func NewRESTServer(grpcServer *grpcserver.Server) *RESTServer {
 		MaxAge:           12 * time.Hour,
 	}))
 
+	// Initialize S3 client for downloading query results
+	s3Client, err := s3.NewClient(context.Background(), "us-east-1") // TODO: Make region configurable
+	if err != nil {
+		// S3 client is optional, log warning but continue
+		fmt.Printf("Warning: Failed to initialize S3 client: %v\n", err)
+	}
+
 	server := &RESTServer{
-		grpcServer:    grpcServer,
-		sidecarClient: sidecar.NewClient(),
-		router:        router,
+		grpcServer: grpcServer,
+		s3Client:   s3Client,
+		router:     router,
 	}
 
 	server.setupRoutes()
@@ -247,17 +257,19 @@ func (s *RESTServer) executeQueryHandler(c *gin.Context) {
 		return
 	}
 
-	// Route query to sidecar via HTTP
-	sidecarEndpoint := targetSidecar.Hostname // Format: "hostname:port"
-	if sidecarEndpoint == "" {
+	// Create sidecar gRPC client
+	sidecarClient, err := sidecar.NewClient(targetSidecar.GRPCAddress)
+	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Sidecar endpoint not available",
+			"error":      fmt.Sprintf("Failed to connect to sidecar: %v", err),
+			"sidecar_id": targetSidecar.ID,
 		})
 		return
 	}
+	defer sidecarClient.Close()
 
 	// Execute query on sidecar
-	queryResp, err := s.sidecarClient.ExecuteQuery(c.Request.Context(), sidecarEndpoint, req.Query)
+	queryResp, err := sidecarClient.ExecuteQuery(c.Request.Context(), req.Query)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error":      fmt.Sprintf("Failed to execute query on sidecar: %v", err),
@@ -268,8 +280,8 @@ func (s *RESTServer) executeQueryHandler(c *gin.Context) {
 
 	// Build response
 	response := QueryResponse{
-		QueryID:      fmt.Sprintf("q-%d", time.Now().UnixNano()),
-		GeneratedSQL: queryResp.GeneratedSQL,
+		QueryID:      queryResp.QueryId,
+		GeneratedSQL: queryResp.GeneratedQuery,
 		Error:        queryResp.Error,
 		Metadata: map[string]interface{}{
 			"team_id":      teamID,
@@ -278,11 +290,28 @@ func (s *RESTServer) executeQueryHandler(c *gin.Context) {
 		},
 	}
 
-	if queryResp.Results != nil {
-		response.Results = &QueryResults{
-			Columns:  queryResp.Results.Columns,
-			Rows:     queryResp.Results.Rows,
-			RowCount: queryResp.Results.Count,
+	// Handle inline results or S3 path
+	if inlineResult := queryResp.GetInlineResult(); inlineResult != nil {
+		response.Results = convertProtoToQueryResults(inlineResult)
+	} else if s3Path := queryResp.GetS3Path(); s3Path != "" {
+		// Download results from S3
+		if s.s3Client != nil {
+			s3Result, err := s.s3Client.DownloadQueryResult(c.Request.Context(), s3Path)
+			if err != nil {
+				response.Error = fmt.Sprintf("Failed to download results from S3: %v", err)
+				response.Metadata["s3_path"] = s3Path
+			} else {
+				response.Results = &QueryResults{
+					Columns:  s3Result.Columns,
+					Rows:     s3Result.Rows,
+					RowCount: s3Result.Count,
+				}
+				response.Metadata["s3_path"] = s3Path
+				response.Metadata["downloaded_from_s3"] = true
+			}
+		} else {
+			response.Error = "Results stored in S3 but S3 client not available"
+			response.Metadata["s3_path"] = s3Path
 		}
 	}
 
@@ -318,3 +347,50 @@ func (s *RESTServer) getSchemaHandler(c *gin.Context) {
 		"message":    "Schema retrieval not yet implemented",
 	})
 }
+
+// Helper function to convert proto QueryResult to REST API QueryResults
+func convertProtoToQueryResults(protoResult *pb.QueryResult) *QueryResults {
+	if protoResult == nil {
+		return nil
+	}
+
+	rows := make([]map[string]interface{}, 0, len(protoResult.Rows))
+	for _, protoRow := range protoResult.Rows {
+		row := make(map[string]interface{})
+		for key, val := range protoRow.Values {
+			row[key] = protoValueToInterface(val)
+		}
+		rows = append(rows, row)
+	}
+
+	return &QueryResults{
+		Columns:  protoResult.Columns,
+		Rows:     rows,
+		RowCount: int(protoResult.RowCount),
+	}
+}
+
+// Helper function to convert proto Value to interface{}
+func protoValueToInterface(val *pb.Value) interface{} {
+	if val == nil || val.IsNull {
+		return nil
+	}
+
+	switch v := val.Value.(type) {
+	case *pb.Value_StringValue:
+		return v.StringValue
+	case *pb.Value_IntValue:
+		return v.IntValue
+	case *pb.Value_DoubleValue:
+		return v.DoubleValue
+	case *pb.Value_BoolValue:
+		return v.BoolValue
+	case *pb.Value_BytesValue:
+		return v.BytesValue
+	case *pb.Value_TimestampValue:
+		return v.TimestampValue.AsTime()
+	default:
+		return nil
+	}
+}
+

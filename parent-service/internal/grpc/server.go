@@ -8,6 +8,7 @@ import (
 	"time"
 
 	pb "github.com/notsoMySQL/sidecar-client"
+	"github.com/notsoMySQL/parent-service/internal/sidecar"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -26,6 +27,7 @@ type SidecarInfo struct {
 	Version      string
 	DBInfo       *pb.DatabaseInfo
 	Hostname     string
+	GRPCAddress  string // host:port for gRPC connection
 	Status       string
 	LastSeen     time.Time
 	RegisteredAt time.Time
@@ -47,6 +49,7 @@ func (s *Server) RegisterSidecar(ctx context.Context, req *pb.RegisterRequest) (
 	sidecarID := fmt.Sprintf("%s-%s-%d", req.TeamId, req.ServiceName, time.Now().Unix())
 
 	// Store sidecar info
+	// Hostname already contains "host:port" format from sidecar registration
 	s.sidecars[sidecarID] = &SidecarInfo{
 		ID:           sidecarID,
 		TeamID:       req.TeamId,
@@ -54,6 +57,7 @@ func (s *Server) RegisterSidecar(ctx context.Context, req *pb.RegisterRequest) (
 		Version:      req.Version,
 		DBInfo:       req.DbInfo,
 		Hostname:     req.Hostname,
+		GRPCAddress:  req.Hostname, // Use hostname:port for gRPC connection
 		Status:       "healthy",
 		LastSeen:     time.Now(),
 		RegisteredAt: time.Now(),
@@ -95,41 +99,70 @@ func (s *Server) Heartbeat(ctx context.Context, req *pb.HeartbeatRequest) (*pb.H
 // ExecuteQuery handles query execution requests
 func (s *Server) ExecuteQuery(ctx context.Context, req *pb.QueryRequest) (*pb.QueryResponse, error) {
 	s.mu.RLock()
-	_, exists := s.sidecars[req.SidecarId]
+	sidecarInfo, exists := s.sidecars[req.SidecarId]
 	s.mu.RUnlock()
 
 	if !exists {
 		return nil, fmt.Errorf("sidecar %s not found", req.SidecarId)
 	}
 
-	log.Printf("Received query from sidecar %s (team: %s): %s", req.SidecarId, req.TeamId, req.Query)
+	log.Printf("Routing query to sidecar %s (team: %s): %s", req.SidecarId, req.TeamId, req.Query)
 
-	// TODO: Implement actual query routing to sidecar
-	// For now, return a placeholder response
+	// Create sidecar client
+	client, err := sidecar.NewClient(sidecarInfo.GRPCAddress)
+	if err != nil {
+		return &pb.QueryResponse{
+			QueryId: fmt.Sprintf("q-%d", time.Now().Unix()),
+			Error:   fmt.Sprintf("Failed to connect to sidecar: %v", err),
+		}, nil
+	}
+	defer client.Close()
+
+	// Execute query on sidecar
+	resp, err := client.ExecuteQuery(ctx, req.Query)
+	if err != nil {
+		return &pb.QueryResponse{
+			QueryId: fmt.Sprintf("q-%d", time.Now().Unix()),
+			Error:   fmt.Sprintf("Failed to execute query: %v", err),
+		}, nil
+	}
+
+	// Convert SidecarQueryResponse to QueryResponse
 	return &pb.QueryResponse{
-		QueryId: fmt.Sprintf("q-%d", time.Now().Unix()),
-		Error:   "Query execution not yet implemented in parent service",
+		QueryId:        resp.QueryId,
+		GeneratedQuery: resp.GeneratedQuery,
+		Result:         resp.GetInlineResult(),
+		Metadata:       resp.Metadata,
+		Error:          resp.Error,
 	}, nil
 }
 
 // GetSchema retrieves database schema
 func (s *Server) GetSchema(ctx context.Context, req *pb.SchemaRequest) (*pb.SchemaResponse, error) {
 	s.mu.RLock()
-	_, exists := s.sidecars[req.SidecarId]
+	sidecarInfo, exists := s.sidecars[req.SidecarId]
 	s.mu.RUnlock()
 
 	if !exists {
 		return nil, fmt.Errorf("sidecar %s not found", req.SidecarId)
 	}
 
-	log.Printf("Schema request from sidecar %s (team: %s)", req.SidecarId, req.TeamId)
+	log.Printf("Routing schema request to sidecar %s (team: %s)", req.SidecarId, req.TeamId)
 
-	// TODO: Implement schema retrieval
-	return &pb.SchemaResponse{
-		Tables:        []*pb.TableSchema{},
-		SchemaVersion: "1.0",
-		LastUpdated:   timestamppb.Now(),
-	}, nil
+	// Create sidecar client
+	client, err := sidecar.NewClient(sidecarInfo.GRPCAddress)
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to sidecar: %w", err)
+	}
+	defer client.Close()
+
+	// Get schema from sidecar
+	resp, err := client.GetSchema(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get schema: %w", err)
+	}
+
+	return resp, nil
 }
 
 // SaveDashboard saves a dashboard configuration

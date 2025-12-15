@@ -1,0 +1,31 @@
+database:
+  type: mysql
+  host: localhost
+  port: 3306
+  user: root
+  password: password
+  dbname: testdb
+
+ai:
+  provider: ollama  # ollama or bedrock
+  aws_region: us-east-1
+  model_id: qwen2.5-coder:7b
+  ollama_url: http://host.docker.internal:11434
+
+server:
+  port: 8080
+
+parent:
+  address: localhost:9090
+  enabled: false
+
+sidecar:
+  team_id: default-team
+  service_name: default-service
+  version: 1.0.0
+
+s3:
+  bucket: ai-query-results       # S3 bucket for storing large query results
+  region: us-east-1              # AWS region for S3
+  result_size_limit: 1048576     # 1MB in bytes - results larger than this go to S3
+                                 # For LocalStack development, set AWS_ENDPOINT_URL=http://localhost:4566

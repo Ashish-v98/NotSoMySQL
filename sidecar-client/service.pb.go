@@ -1107,7 +1107,7 @@ func (x *SchemaRequest) GetIncludeSampleData() bool {
 
 type SchemaResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Tables        []*TableSchema         `protobuf:"bytes,1,rep,name=tables,proto3" json:"tables,omitempty"`
+	SchemaText    string                 `protobuf:"bytes,1,opt,name=schema_text,json=schemaText,proto3" json:"schema_text,omitempty"` // Raw schema as string (for AI context)
 	SchemaVersion string                 `protobuf:"bytes,2,opt,name=schema_version,json=schemaVersion,proto3" json:"schema_version,omitempty"`
 	LastUpdated   *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=last_updated,json=lastUpdated,proto3" json:"last_updated,omitempty"`
 	unknownFields protoimpl.UnknownFields
@@ -1144,11 +1144,11 @@ func (*SchemaResponse) Descriptor() ([]byte, []int) {
 	return file_service_proto_rawDescGZIP(), []int{15}
 }
 
-func (x *SchemaResponse) GetTables() []*TableSchema {
+func (x *SchemaResponse) GetSchemaText() string {
 	if x != nil {
-		return x.Tables
+		return x.SchemaText
 	}
-	return nil
+	return ""
 }
 
 func (x *SchemaResponse) GetSchemaVersion() string {
@@ -2023,6 +2023,128 @@ func (x *DirectQueryRequest) GetOptions() *QueryOptions {
 	return nil
 }
 
+// HealthCheckRequest for sidecar health check
+type HealthCheckRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *HealthCheckRequest) Reset() {
+	*x = HealthCheckRequest{}
+	mi := &file_service_proto_msgTypes[29]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *HealthCheckRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*HealthCheckRequest) ProtoMessage() {}
+
+func (x *HealthCheckRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_service_proto_msgTypes[29]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use HealthCheckRequest.ProtoReflect.Descriptor instead.
+func (*HealthCheckRequest) Descriptor() ([]byte, []int) {
+	return file_service_proto_rawDescGZIP(), []int{29}
+}
+
+// HealthCheckResponse returns sidecar health status
+type HealthCheckResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Status        string                 `protobuf:"bytes,1,opt,name=status,proto3" json:"status,omitempty"` // "healthy", "degraded", "unhealthy"
+	Timestamp     *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
+	AiProvider    string                 `protobuf:"bytes,3,opt,name=ai_provider,json=aiProvider,proto3" json:"ai_provider,omitempty"`
+	AiModel       string                 `protobuf:"bytes,4,opt,name=ai_model,json=aiModel,proto3" json:"ai_model,omitempty"`
+	DbType        string                 `protobuf:"bytes,5,opt,name=db_type,json=dbType,proto3" json:"db_type,omitempty"`
+	DbName        string                 `protobuf:"bytes,6,opt,name=db_name,json=dbName,proto3" json:"db_name,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *HealthCheckResponse) Reset() {
+	*x = HealthCheckResponse{}
+	mi := &file_service_proto_msgTypes[30]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *HealthCheckResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*HealthCheckResponse) ProtoMessage() {}
+
+func (x *HealthCheckResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_service_proto_msgTypes[30]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use HealthCheckResponse.ProtoReflect.Descriptor instead.
+func (*HealthCheckResponse) Descriptor() ([]byte, []int) {
+	return file_service_proto_rawDescGZIP(), []int{30}
+}
+
+func (x *HealthCheckResponse) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+func (x *HealthCheckResponse) GetTimestamp() *timestamppb.Timestamp {
+	if x != nil {
+		return x.Timestamp
+	}
+	return nil
+}
+
+func (x *HealthCheckResponse) GetAiProvider() string {
+	if x != nil {
+		return x.AiProvider
+	}
+	return ""
+}
+
+func (x *HealthCheckResponse) GetAiModel() string {
+	if x != nil {
+		return x.AiModel
+	}
+	return ""
+}
+
+func (x *HealthCheckResponse) GetDbType() string {
+	if x != nil {
+		return x.DbType
+	}
+	return ""
+}
+
+func (x *HealthCheckResponse) GetDbName() string {
+	if x != nil {
+		return x.DbName
+	}
+	return ""
+}
+
 var File_service_proto protoreflect.FileDescriptor
 
 const file_service_proto_rawDesc = "" +
@@ -2118,9 +2240,10 @@ const file_service_proto_rawDesc = "" +
 	"\n" +
 	"sidecar_id\x18\x01 \x01(\tR\tsidecarId\x12\x17\n" +
 	"\ateam_id\x18\x02 \x01(\tR\x06teamId\x12.\n" +
-	"\x13include_sample_data\x18\x03 \x01(\bR\x11includeSampleData\"\xa7\x01\n" +
-	"\x0eSchemaResponse\x12/\n" +
-	"\x06tables\x18\x01 \x03(\v2\x17.aiquery.v1.TableSchemaR\x06tables\x12%\n" +
+	"\x13include_sample_data\x18\x03 \x01(\bR\x11includeSampleData\"\x97\x01\n" +
+	"\x0eSchemaResponse\x12\x1f\n" +
+	"\vschema_text\x18\x01 \x01(\tR\n" +
+	"schemaText\x12%\n" +
 	"\x0eschema_version\x18\x02 \x01(\tR\rschemaVersion\x12=\n" +
 	"\flast_updated\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\vlastUpdated\"\x9f\x01\n" +
 	"\vTableSchema\x12\x12\n" +
@@ -2190,12 +2313,22 @@ const file_service_proto_rawDesc = "" +
 	"\x13include_sample_data\x18\x01 \x01(\bR\x11includeSampleData\"Z\n" +
 	"\x12DirectQueryRequest\x12\x10\n" +
 	"\x03sql\x18\x01 \x01(\tR\x03sql\x122\n" +
-	"\aoptions\x18\x02 \x01(\v2\x18.aiquery.v1.QueryOptionsR\aoptions2\xfb\x01\n" +
+	"\aoptions\x18\x02 \x01(\v2\x18.aiquery.v1.QueryOptionsR\aoptions\"\x14\n" +
+	"\x12HealthCheckRequest\"\xd5\x01\n" +
+	"\x13HealthCheckResponse\x12\x16\n" +
+	"\x06status\x18\x01 \x01(\tR\x06status\x128\n" +
+	"\ttimestamp\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\ttimestamp\x12\x1f\n" +
+	"\vai_provider\x18\x03 \x01(\tR\n" +
+	"aiProvider\x12\x19\n" +
+	"\bai_model\x18\x04 \x01(\tR\aaiModel\x12\x17\n" +
+	"\adb_type\x18\x05 \x01(\tR\x06dbType\x12\x17\n" +
+	"\adb_name\x18\x06 \x01(\tR\x06dbName2\xfb\x01\n" +
 	"\rParentService\x12L\n" +
 	"\x0fRegisterSidecar\x12\x1b.aiquery.v1.RegisterRequest\x1a\x1c.aiquery.v1.RegisterResponse\x12H\n" +
 	"\tHeartbeat\x12\x1c.aiquery.v1.HeartbeatRequest\x1a\x1d.aiquery.v1.HeartbeatResponse\x12R\n" +
-	"\x11UnregisterSidecar\x12\x1d.aiquery.v1.UnregisterRequest\x1a\x1e.aiquery.v1.UnregisterResponse2\x86\x02\n" +
-	"\x0eSidecarService\x12Q\n" +
+	"\x11UnregisterSidecar\x12\x1d.aiquery.v1.UnregisterRequest\x1a\x1e.aiquery.v1.UnregisterResponse2\xd1\x02\n" +
+	"\x0eSidecarService\x12I\n" +
+	"\x06Health\x12\x1e.aiquery.v1.HealthCheckRequest\x1a\x1f.aiquery.v1.HealthCheckResponse\x12Q\n" +
 	"\fExecuteQuery\x12\x1f.aiquery.v1.SidecarQueryRequest\x1a .aiquery.v1.SidecarQueryResponse\x12V\n" +
 	"\x12ExecuteDirectQuery\x12\x1e.aiquery.v1.DirectQueryRequest\x1a .aiquery.v1.SidecarQueryResponse\x12I\n" +
 	"\tGetSchema\x12 .aiquery.v1.SidecarSchemaRequest\x1a\x1a.aiquery.v1.SchemaResponseB5Z3github.com/notsoMySQL/sidecar-client;sidecar_clientb\x06proto3"
@@ -2212,7 +2345,7 @@ func file_service_proto_rawDescGZIP() []byte {
 	return file_service_proto_rawDescData
 }
 
-var file_service_proto_msgTypes = make([]protoimpl.MessageInfo, 32)
+var file_service_proto_msgTypes = make([]protoimpl.MessageInfo, 34)
 var file_service_proto_goTypes = []any{
 	(*RegisterRequest)(nil),       // 0: aiquery.v1.RegisterRequest
 	(*RegisterResponse)(nil),      // 1: aiquery.v1.RegisterResponse
@@ -2243,51 +2376,55 @@ var file_service_proto_goTypes = []any{
 	(*SidecarQueryResponse)(nil),  // 26: aiquery.v1.SidecarQueryResponse
 	(*SidecarSchemaRequest)(nil),  // 27: aiquery.v1.SidecarSchemaRequest
 	(*DirectQueryRequest)(nil),    // 28: aiquery.v1.DirectQueryRequest
-	nil,                           // 29: aiquery.v1.Row.ValuesEntry
-	nil,                           // 30: aiquery.v1.SaveDashboardRequest.MetadataEntry
-	nil,                           // 31: aiquery.v1.Widget.ConfigEntry
-	(*timestamppb.Timestamp)(nil), // 32: google.protobuf.Timestamp
+	(*HealthCheckRequest)(nil),    // 29: aiquery.v1.HealthCheckRequest
+	(*HealthCheckResponse)(nil),   // 30: aiquery.v1.HealthCheckResponse
+	nil,                           // 31: aiquery.v1.Row.ValuesEntry
+	nil,                           // 32: aiquery.v1.SaveDashboardRequest.MetadataEntry
+	nil,                           // 33: aiquery.v1.Widget.ConfigEntry
+	(*timestamppb.Timestamp)(nil), // 34: google.protobuf.Timestamp
 }
 var file_service_proto_depIdxs = []int32{
 	2,  // 0: aiquery.v1.RegisterRequest.db_info:type_name -> aiquery.v1.DatabaseInfo
-	32, // 1: aiquery.v1.HeartbeatRequest.timestamp:type_name -> google.protobuf.Timestamp
+	34, // 1: aiquery.v1.HeartbeatRequest.timestamp:type_name -> google.protobuf.Timestamp
 	5,  // 2: aiquery.v1.HeartbeatRequest.metrics:type_name -> aiquery.v1.HealthMetrics
-	32, // 3: aiquery.v1.HeartbeatResponse.server_time:type_name -> google.protobuf.Timestamp
+	34, // 3: aiquery.v1.HeartbeatResponse.server_time:type_name -> google.protobuf.Timestamp
 	7,  // 4: aiquery.v1.QueryRequest.options:type_name -> aiquery.v1.QueryOptions
 	9,  // 5: aiquery.v1.QueryResponse.result:type_name -> aiquery.v1.QueryResult
 	12, // 6: aiquery.v1.QueryResponse.metadata:type_name -> aiquery.v1.QueryMetadata
 	10, // 7: aiquery.v1.QueryResult.rows:type_name -> aiquery.v1.Row
-	29, // 8: aiquery.v1.Row.values:type_name -> aiquery.v1.Row.ValuesEntry
-	32, // 9: aiquery.v1.Value.timestamp_value:type_name -> google.protobuf.Timestamp
-	32, // 10: aiquery.v1.QueryMetadata.execution_time:type_name -> google.protobuf.Timestamp
+	31, // 8: aiquery.v1.Row.values:type_name -> aiquery.v1.Row.ValuesEntry
+	34, // 9: aiquery.v1.Value.timestamp_value:type_name -> google.protobuf.Timestamp
+	34, // 10: aiquery.v1.QueryMetadata.execution_time:type_name -> google.protobuf.Timestamp
 	10, // 11: aiquery.v1.QueryResultChunk.rows:type_name -> aiquery.v1.Row
-	16, // 12: aiquery.v1.SchemaResponse.tables:type_name -> aiquery.v1.TableSchema
-	32, // 13: aiquery.v1.SchemaResponse.last_updated:type_name -> google.protobuf.Timestamp
-	17, // 14: aiquery.v1.TableSchema.columns:type_name -> aiquery.v1.ColumnSchema
-	18, // 15: aiquery.v1.TableSchema.indexes:type_name -> aiquery.v1.Index
-	21, // 16: aiquery.v1.SaveDashboardRequest.widgets:type_name -> aiquery.v1.Widget
-	30, // 17: aiquery.v1.SaveDashboardRequest.metadata:type_name -> aiquery.v1.SaveDashboardRequest.MetadataEntry
-	31, // 18: aiquery.v1.Widget.config:type_name -> aiquery.v1.Widget.ConfigEntry
-	22, // 19: aiquery.v1.Widget.position:type_name -> aiquery.v1.Position
-	7,  // 20: aiquery.v1.SidecarQueryRequest.options:type_name -> aiquery.v1.QueryOptions
-	9,  // 21: aiquery.v1.SidecarQueryResponse.inline_result:type_name -> aiquery.v1.QueryResult
-	12, // 22: aiquery.v1.SidecarQueryResponse.metadata:type_name -> aiquery.v1.QueryMetadata
-	7,  // 23: aiquery.v1.DirectQueryRequest.options:type_name -> aiquery.v1.QueryOptions
+	34, // 12: aiquery.v1.SchemaResponse.last_updated:type_name -> google.protobuf.Timestamp
+	17, // 13: aiquery.v1.TableSchema.columns:type_name -> aiquery.v1.ColumnSchema
+	18, // 14: aiquery.v1.TableSchema.indexes:type_name -> aiquery.v1.Index
+	21, // 15: aiquery.v1.SaveDashboardRequest.widgets:type_name -> aiquery.v1.Widget
+	32, // 16: aiquery.v1.SaveDashboardRequest.metadata:type_name -> aiquery.v1.SaveDashboardRequest.MetadataEntry
+	33, // 17: aiquery.v1.Widget.config:type_name -> aiquery.v1.Widget.ConfigEntry
+	22, // 18: aiquery.v1.Widget.position:type_name -> aiquery.v1.Position
+	7,  // 19: aiquery.v1.SidecarQueryRequest.options:type_name -> aiquery.v1.QueryOptions
+	9,  // 20: aiquery.v1.SidecarQueryResponse.inline_result:type_name -> aiquery.v1.QueryResult
+	12, // 21: aiquery.v1.SidecarQueryResponse.metadata:type_name -> aiquery.v1.QueryMetadata
+	7,  // 22: aiquery.v1.DirectQueryRequest.options:type_name -> aiquery.v1.QueryOptions
+	34, // 23: aiquery.v1.HealthCheckResponse.timestamp:type_name -> google.protobuf.Timestamp
 	11, // 24: aiquery.v1.Row.ValuesEntry.value:type_name -> aiquery.v1.Value
 	0,  // 25: aiquery.v1.ParentService.RegisterSidecar:input_type -> aiquery.v1.RegisterRequest
 	3,  // 26: aiquery.v1.ParentService.Heartbeat:input_type -> aiquery.v1.HeartbeatRequest
 	23, // 27: aiquery.v1.ParentService.UnregisterSidecar:input_type -> aiquery.v1.UnregisterRequest
-	25, // 28: aiquery.v1.SidecarService.ExecuteQuery:input_type -> aiquery.v1.SidecarQueryRequest
-	28, // 29: aiquery.v1.SidecarService.ExecuteDirectQuery:input_type -> aiquery.v1.DirectQueryRequest
-	27, // 30: aiquery.v1.SidecarService.GetSchema:input_type -> aiquery.v1.SidecarSchemaRequest
-	1,  // 31: aiquery.v1.ParentService.RegisterSidecar:output_type -> aiquery.v1.RegisterResponse
-	4,  // 32: aiquery.v1.ParentService.Heartbeat:output_type -> aiquery.v1.HeartbeatResponse
-	24, // 33: aiquery.v1.ParentService.UnregisterSidecar:output_type -> aiquery.v1.UnregisterResponse
-	26, // 34: aiquery.v1.SidecarService.ExecuteQuery:output_type -> aiquery.v1.SidecarQueryResponse
-	26, // 35: aiquery.v1.SidecarService.ExecuteDirectQuery:output_type -> aiquery.v1.SidecarQueryResponse
-	15, // 36: aiquery.v1.SidecarService.GetSchema:output_type -> aiquery.v1.SchemaResponse
-	31, // [31:37] is the sub-list for method output_type
-	25, // [25:31] is the sub-list for method input_type
+	29, // 28: aiquery.v1.SidecarService.Health:input_type -> aiquery.v1.HealthCheckRequest
+	25, // 29: aiquery.v1.SidecarService.ExecuteQuery:input_type -> aiquery.v1.SidecarQueryRequest
+	28, // 30: aiquery.v1.SidecarService.ExecuteDirectQuery:input_type -> aiquery.v1.DirectQueryRequest
+	27, // 31: aiquery.v1.SidecarService.GetSchema:input_type -> aiquery.v1.SidecarSchemaRequest
+	1,  // 32: aiquery.v1.ParentService.RegisterSidecar:output_type -> aiquery.v1.RegisterResponse
+	4,  // 33: aiquery.v1.ParentService.Heartbeat:output_type -> aiquery.v1.HeartbeatResponse
+	24, // 34: aiquery.v1.ParentService.UnregisterSidecar:output_type -> aiquery.v1.UnregisterResponse
+	30, // 35: aiquery.v1.SidecarService.Health:output_type -> aiquery.v1.HealthCheckResponse
+	26, // 36: aiquery.v1.SidecarService.ExecuteQuery:output_type -> aiquery.v1.SidecarQueryResponse
+	26, // 37: aiquery.v1.SidecarService.ExecuteDirectQuery:output_type -> aiquery.v1.SidecarQueryResponse
+	15, // 38: aiquery.v1.SidecarService.GetSchema:output_type -> aiquery.v1.SchemaResponse
+	32, // [32:39] is the sub-list for method output_type
+	25, // [25:32] is the sub-list for method input_type
 	25, // [25:25] is the sub-list for extension type_name
 	25, // [25:25] is the sub-list for extension extendee
 	0,  // [0:25] is the sub-list for field type_name
@@ -2316,7 +2453,7 @@ func file_service_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_service_proto_rawDesc), len(file_service_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   32,
+			NumMessages:   34,
 			NumExtensions: 0,
 			NumServices:   2,
 		},
